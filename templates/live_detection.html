@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Color Detection</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #222;
+      color: white;
+      text-align: center;
+      padding: 1rem;
+    }
+    video, canvas {
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+      max-width: 90vw;
+      max-height: 60vh;
+      margin: 1rem auto;
+      display: block;
+    }
+    #cameraSelect {
+      max-width: 200px;
+      margin: 12px auto 0 auto;
+      border-radius: 6px;
+      font-size: 1rem;
+      padding: 0.3rem;
+      display: block;
+    }
+    #button-container {
+      margin: 1rem;
+    }
+    button {
+      padding: 10px 25px;
+      font-size: 1.1rem;
+      border-radius: 30px;
+      border: none;
+      background: #2196f3;
+      color: white;
+      cursor: pointer;
+      margin: 0 8px;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #0b7dda;
+    }
+  </style>
+</head>
+<body>
+  <h1>Live Color Detection via Webcam</h1>
+
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="outputCanvas"></canvas>
+  <select id="cameraSelect" aria-label="Select Camera"></select>
+  <div id="button-container">
+    <button id="startBtn" disabled>Start Webcam</button>
+    <button id="stopBtn" disabled>Stop Webcam</button>
+  </div>
+
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
+  <script>
+    let video = document.getElementById('video');
+    let outputCanvas = document.getElementById('outputCanvas');
+    let cameraSelect = document.getElementById('cameraSelect');
+    let streaming = false;
+    let videoStream = null;
+    let cap = null;
+
+    function onOpenCvReady() {
+      console.log("OpenCV.js loaded.");
+      document.getElementById('startBtn').disabled = false;
+      listCameras();
+    }
+
+    async function listCameras() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        cameraSelect.innerHTML = '';
+        videoDevices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          option.text = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(option);
+        });
+      } catch (err) {
+        alert("Error accessing cameras: " + err.message);
+      }
+    }
+
+    document.getElementById('startBtn').onclick = async () => {
+      if(videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+      }
+      const deviceId = cameraSelect.value;
+      const constraints = {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "environment"
+        }
+      };
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = videoStream;
+        streaming = true;
+        video.onloadedmetadata = () => {
+          outputCanvas.width = video.videoWidth;
+          outputCanvas.height = video.videoHeight;
+          cap = new cv.VideoCapture(video);
+          processVideo();
+        };
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        cameraSelect.disabled = true;
+      } catch (err) {
+        alert("Cannot access webcam: " + err.message);
+      }
+    };
+
+    document.getElementById('stopBtn').onclick = () => {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+      streaming = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      cameraSelect.disabled = false;
+      clearCanvas();
+    };
+
+    function processVideo() {
+      if (!streaming) return;
+      let src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+      let dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+      const FPS = 30;
+      function detectColors() {
+        if (!streaming) {
+          src.delete();
+          dst.delete();
+          return;
+        }
+        cap.read(src);
+
+        // Convert to HSV color space
+        let hsv = new cv.Mat();
+        cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
+        cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
+
+        // Example: Detect red color in HSV range (adjust or add more colors as needed)
+        let low1 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [0, 120, 70, 0]);
+        let high1 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [10, 255, 255, 255]);
+        let mask1 = new cv.Mat();
+        cv.inRange(hsv, low1, high1, mask1);
+
+        let low2 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [170, 120, 70, 0]);
+        let high2 = new cv.Mat(hsv.rows, hsv.cols, hsv.type(), [180, 255, 255, 255]);
+        let mask2 = new cv.Mat();
+        cv.inRange(hsv, low2, high2, mask2);
+
+        let mask = new cv.Mat();
+        cv.add(mask1, mask2, mask);
+
+        // Find contours to visualize color regions
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        cv.findContours(mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+        src.copyTo(dst);
+        for (let i = 0; i < contours.size(); ++i) {
+          let cnt = contours.get(i);
+          let area = cv.contourArea(cnt);
+          if (area > 500) {
+            let rect = cv.boundingRect(cnt);
+            let pt1 = new cv.Point(rect.x, rect.y);
+            let pt2 = new cv.Point(rect.x + rect.width, rect.y + rect.height);
+            cv.rectangle(dst, pt1, pt2, [255, 0, 0, 255], 3);
+            cnt.delete(); pt1.delete(); pt2.delete();
+          }
+        }
+
+        cv.imshow('outputCanvas', dst);
+
+        // Release mats for next frame
+        low1.delete(); high1.delete(); low2.delete(); high2.delete();
+        mask1.delete(); mask2.delete(); mask.delete();
+        contours.delete(); hierarchy.delete();
+        hsv.delete();
+
+        setTimeout(detectColors, 1000 / FPS);
+      }
+      detectColors();
+    }
+
+    function clearCanvas() {
+      let ctx = outputCanvas.getContext('2d');
+      ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Color Detection - Upload Image</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    @keyframes gradientShift {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+    body {
+      background: linear-gradient(270deg, #6a11cb, #2575fc, #6a11cb, #2575fc);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0 1rem;
+    }
+    .fluid-upload {
+      max-width: 520px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+      padding: 3rem 2.5rem 2rem 2.5rem;
+      text-align: center;
+      backdrop-filter: saturate(180%) blur(20px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .fluid-upload:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 25px 55px rgba(0,0,0,0.35);
+    }
+    h1 {
+      font-weight: 700;
+      color: #2575fc;
+      text-shadow: 0 0 7px rgb(37 117 252 / 0.7);
+      margin-bottom: 2rem;
+      letter-spacing: 0.5px;
+    }
+    input[type="file"] {
+      border: none;
+      background: #fff;
+      padding: 0.9rem 1.2rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      border: 2px solid transparent;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    input[type="file"]:focus, input[type="file"]:hover {
+      border-color: #2575fc;
+      box-shadow: 0 0 15px rgba(37, 117, 252, 0.5);
+      outline: none;
+    }
+    button.btn-primary {
+      background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+      border: none;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 0.8rem 2rem;
+      margin-top: 1.5rem;
+      border-radius: 50px;
+      box-shadow: 0 10px 30px rgb(37 117 252 / 0.6);
+      transition: filter 0.3s ease, box-shadow 0.3s ease;
+      width: 100%;
+      max-width: 100%;
+      cursor: pointer;
+    }
+    button.btn-primary:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 15px 45px rgb(37 117 252 / 0.8);
+    }
+    .alert-warning {
+      color: #7a4069;
+      background: #ffeadf;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      box-shadow: 0 4px 15px rgba(255, 110, 0, 0.5);
+      margin-bottom: 1.2rem;
+      padding: 1rem 1.25rem;
+      animation: fadeInDown 0.7s ease forwards;
+    }
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    p.file-types {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #545454;
+      letter-spacing: 0.07rem;
+    }
+    @media (max-width: 460px) {
+      .fluid-upload {
+        padding: 2rem 1.5rem 1.5rem 1.5rem;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      input[type="file"], button.btn-primary {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="fluid-upload">
+    <h1>Upload an Image for Color Detection</h1>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="alert alert-warning" role="alert">
+        {% for message in messages %}
+        <p>{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('upload_image') }}" enctype="multipart/form-data" novalidate>
+      <input type="file" name="image" accept="image/*" required />
+      <button type="submit" class="btn btn-primary">Upload and Detect Colors</button>
+    </form>
+
+    <p class="file-types">Supported file types: PNG, JPG, JPEG, GIF.</p>
+  </div>
+</body>
+</html>
